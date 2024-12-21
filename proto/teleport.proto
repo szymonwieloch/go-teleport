@@ -1,0 +1,55 @@
+syntax = "proto3";
+package teleport;
+
+option go_package = "proto/teleportproto";
+
+service RemoteExecutor {
+    rpc Start (Command) returns (StartedTask);
+    rpc Stop (TaskId) returns (StoppedTask);
+    rpc Logs (TaskId) returns (stream Log);
+    rpc GetStatus (TaskId) returns (Status);
+    
+}
+
+message TaskId {
+    string uuid = 1;
+}
+
+message Command {
+    repeated string command = 1;
+}
+
+message StartedTask {
+    TaskId id = 1;
+    // possibly more fields
+}
+
+message StoppedTask{
+    int32 error_code = 1;
+    //possibly more fields
+}
+
+message Status {
+    oneof task_status{
+        StartedTask started = 1;
+        StoppedTask stopped = 2;
+    }
+}
+
+message PendingTask{
+    int64 runtime = 1;
+    //possibly more fields
+}
+
+message TextOutput{
+    string text = 1;
+}
+
+message Log{
+    TextOutput stdout = 1;
+    TextOutput stderr = 2;
+}
+
+
+
+

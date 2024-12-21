@@ -23,3 +23,8 @@ go.work.sum
 
 # env file
 .env
+
+src/client/proto
+src/server/server
+src/client/client
+
