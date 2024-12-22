@@ -26,6 +26,7 @@ go.sum
 .env
 
 src/client/proto
+src/server/proto
 src/server/server
 src/client/client
 
