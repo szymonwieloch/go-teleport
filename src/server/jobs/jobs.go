@@ -34,6 +34,16 @@ func (job *Job) stop() error {
 	return nil
 }
 
+func (job *Job) Status() (*RunningJobStatus, *StoppedJobStatus) {
+	job.mutex.Lock()
+	defer job.mutex.Unlock()
+	if job.cmd.ProcessState.Exited() {
+		return nil, &StoppedJobStatus{JobStatus: JobStatus{ID: job.Id}, ExitCode: job.cmd.ProcessState.ExitCode()}
+	} else {
+		return &RunningJobStatus{JobStatus: JobStatus{ID: job.Id}}, nil
+	}
+}
+
 type Jobs struct {
 	pending map[JobID]*Job
 	mutex   sync.Mutex

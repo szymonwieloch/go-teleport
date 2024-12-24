@@ -24,7 +24,11 @@ func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*telepo
 	if err != nil {
 		return nil, status.Error(codes.Internal, "could not start the process")
 	}
-	return &teleportproto.StartedTask{Id: &teleportproto.TaskId{Uuid: string(job.Id)}}, nil
+	running, _ := job.Status()
+	if running == nil {
+		return nil, status.Error(codes.Internal, "process not running")
+	}
+	return startedJobStatus(running), nil
 }
 
 func (s *server) Stop(ctx context.Context, req *teleportproto.TaskId) (*teleportproto.StoppedTask, error) {
@@ -37,7 +41,11 @@ func (s *server) Stop(ctx context.Context, req *teleportproto.TaskId) (*teleport
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	return stoppedJobStatusFromStoppedJob(job), nil
+	_, stopped := job.Status()
+	if stopped == nil {
+		return nil, status.Error(codes.Internal, "process not stopped")
+	}
+	return stoppedJobStatus(stopped), nil
 }
 
 func (s *server) List(ctx context.Context, req *empty.Empty) (*teleportproto.ListOfTasks, error) {
@@ -45,7 +53,7 @@ func (s *server) List(ctx context.Context, req *empty.Empty) (*teleportproto.Lis
 	jobs := s.jobs.List()
 	output := make([]*teleportproto.Status, 0, len(jobs))
 	for _, job := range jobs {
-		output = append(output, jobStatusFromJob(job))
+		output = append(output, jobStatus(job.Status()))
 	}
 	return &teleportproto.ListOfTasks{Tasks: output}, nil
 }
@@ -62,7 +70,7 @@ func (s *server) GetStatus(ctx context.Context, req *teleportproto.TaskId) (*tel
 	if job == nil {
 		return nil, status.Error(codes.NotFound, "id was not found")
 	}
-	return jobStatusFromJob(job), nil
+	return jobStatus(job.Status()), nil
 }
 
 func startServer(addr string) {
