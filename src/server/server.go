@@ -60,8 +60,23 @@ func (s *server) List(ctx context.Context, req *empty.Empty) (*teleportproto.Lis
 
 func (s *server) Logs(req *teleportproto.TaskId, srv grpc.ServerStreamingServer[teleportproto.Log]) error {
 	log.Println("Showing logs for job", req.Uuid)
-	// TODO: Implement this method
-	return nil
+	job := s.jobs.Find(jobs.JobID(req.Uuid))
+	if job == nil {
+		return status.Error(codes.NotFound, "id was not found")
+	}
+	position := 0
+	for {
+		logs := job.GetLogs(position, 10)
+		if len(logs) == 0 {
+			return nil
+		}
+		position += len(logs)
+		for _, log := range logs {
+			if err := srv.Send(&teleportproto.Log{Stdout: &teleportproto.TextOutput{Text: log}}); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (s *server) GetStatus(ctx context.Context, req *teleportproto.TaskId) (*teleportproto.Status, error) {
