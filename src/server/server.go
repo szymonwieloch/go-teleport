@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type server struct {
@@ -65,7 +66,17 @@ func (s *server) Logs(req *teleportproto.JobId, srv grpc.ServerStreamingServer[t
 		}
 		position += len(logs)
 		for _, log := range logs {
-			if err := srv.Send(&teleportproto.Log{Text: log}); err != nil {
+			src := teleportproto.LogSource_LS_STDERR
+			if log.Stdout {
+				src = teleportproto.LogSource_LS_STDOUT
+			}
+			msg := &teleportproto.Log{
+				Text:      log.Line,
+				Src:       src,
+				Timestamp: timestamppb.New(log.Timestamp),
+			}
+			err := srv.Send(msg)
+			if err != nil {
 				return err
 			}
 		}

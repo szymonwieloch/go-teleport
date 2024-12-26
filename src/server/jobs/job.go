@@ -1,22 +1,20 @@
 package jobs
 
 import (
-	"bufio"
-	"io"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type Job struct {
 	sync.Mutex
-	Id            JobID
-	Command       []string
-	cmd           *exec.Cmd
-	cond          *sync.Cond
-	isReadingDone bool
-	logs          []string
+	Id      JobID
+	Command []string
+	Started time.Time
+	cmd     *exec.Cmd
+	logs    *logs
 }
 
 func (job *Job) stop() error {
@@ -35,58 +33,46 @@ func (job *Job) stop() error {
 	return nil
 }
 
-func (job *Job) read(pipe io.ReadCloser) {
-	reader := bufio.NewReader(pipe)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			job.Lock()
-			job.isReadingDone = true
-			job.Unlock()
-			job.cond.Broadcast()
-			break
-		}
-		job.Lock()
-		job.logs = append(job.logs, line)
-		job.Unlock()
-		job.cond.Broadcast()
-	}
-}
-
 func (job *Job) Status() JobStatus {
 	job.Lock()
 	defer job.Unlock()
-	js := JobStatus{ID: job.Id, Logs: len(job.logs), Command: job.Command}
+	js := JobStatus{
+		ID:      job.Id,
+		Logs:    job.logs.size(),
+		Command: job.Command,
+		Started: job.Started,
+	}
 	if job.cmd.ProcessState.Exited() {
-		js.Stopped = &StoppedJobStatus{ExitCode: job.cmd.ProcessState.ExitCode()}
+		js.Stopped = &StoppedJobStatus{
+			ExitCode: job.cmd.ProcessState.ExitCode(),
+			Stopped:  time.Now(), // TODO: fix it
+		}
 	} else {
 		js.Pending = &PendingJobStatus{CPUPercentage: 1.0} // TODO: implement
 	}
 	return js
 }
 
-// Returning 0 length indicates that there are no more logs to return
-func (job *Job) GetLogs(start, maxCount int) []string {
-	job.Lock()
-	defer job.Unlock()
-	for start <= len(job.logs) && !job.isReadingDone {
-		job.cond.Wait()
-	}
-	return job.logs[start:min(start+maxCount, len(job.logs))]
+func (job *Job) GetLogs(start, maxCount int) []LogEntry {
+	return job.logs.get(start, maxCount)
 }
 
 func newJob(command []string) (*Job, error) {
 	cmd := exec.Command(command[0], command[1:]...)
-	pipe, err := cmd.StdoutPipe()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
 	err = cmd.Start()
 	if err != nil {
 		return nil, err
 	}
-	j := &Job{Id: JobID(uuid.New().String()), cmd: cmd}
-	j.cond = sync.NewCond(j)
-	go j.read(pipe)
+
+	j := &Job{Id: JobID(uuid.New().String()), cmd: cmd, Started: time.Now(), Command: command, logs: newLogs(stdout, stderr)}
 	return j, nil
 }
