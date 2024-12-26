@@ -18,20 +18,16 @@ type server struct {
 	jobs jobs.Jobs
 }
 
-func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*teleportproto.StartedTask, error) {
+func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*teleportproto.JobStatus, error) {
 	log.Println("Starting command", req.Command)
 	job, err := s.jobs.Create(req.Command)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "could not start the process")
 	}
-	running, _ := job.Status()
-	if running == nil {
-		return nil, status.Error(codes.Internal, "process not running")
-	}
-	return startedJobStatus(running), nil
+	return jobStatus(job.Status()), nil
 }
 
-func (s *server) Stop(ctx context.Context, req *teleportproto.TaskId) (*teleportproto.StoppedTask, error) {
+func (s *server) Stop(ctx context.Context, req *teleportproto.JobId) (*teleportproto.JobStatus, error) {
 	log.Println("Stopping job", req.Uuid)
 	job, err := s.jobs.Stop(jobs.JobID(req.Uuid))
 	if err != nil {
@@ -41,24 +37,21 @@ func (s *server) Stop(ctx context.Context, req *teleportproto.TaskId) (*teleport
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	_, stopped := job.Status()
-	if stopped == nil {
-		return nil, status.Error(codes.Internal, "process not stopped")
-	}
-	return stoppedJobStatus(stopped), nil
+	return jobStatus(job.Status()), nil
+
 }
 
-func (s *server) List(ctx context.Context, req *empty.Empty) (*teleportproto.ListOfTasks, error) {
+func (s *server) List(ctx context.Context, req *empty.Empty) (*teleportproto.JobList, error) {
 	log.Println("Listing jobs")
 	jobs := s.jobs.List()
-	output := make([]*teleportproto.Status, 0, len(jobs))
+	output := make([]*teleportproto.JobStatus, 0, len(jobs))
 	for _, job := range jobs {
 		output = append(output, jobStatus(job.Status()))
 	}
-	return &teleportproto.ListOfTasks{Tasks: output}, nil
+	return &teleportproto.JobList{Jobs: output}, nil
 }
 
-func (s *server) Logs(req *teleportproto.TaskId, srv grpc.ServerStreamingServer[teleportproto.Log]) error {
+func (s *server) Logs(req *teleportproto.JobId, srv grpc.ServerStreamingServer[teleportproto.Log]) error {
 	log.Println("Showing logs for job", req.Uuid)
 	job := s.jobs.Find(jobs.JobID(req.Uuid))
 	if job == nil {
@@ -72,14 +65,14 @@ func (s *server) Logs(req *teleportproto.TaskId, srv grpc.ServerStreamingServer[
 		}
 		position += len(logs)
 		for _, log := range logs {
-			if err := srv.Send(&teleportproto.Log{Stdout: &teleportproto.TextOutput{Text: log}}); err != nil {
+			if err := srv.Send(&teleportproto.Log{Text: log}); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func (s *server) GetStatus(ctx context.Context, req *teleportproto.TaskId) (*teleportproto.Status, error) {
+func (s *server) GetStatus(ctx context.Context, req *teleportproto.JobId) (*teleportproto.JobStatus, error) {
 	log.Println("Showing status for job", req.Uuid)
 	job := s.jobs.Find(jobs.JobID(req.Uuid))
 	if job == nil {

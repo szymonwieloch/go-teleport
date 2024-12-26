@@ -12,6 +12,7 @@ import (
 type Job struct {
 	sync.Mutex
 	Id            JobID
+	Command       []string
 	cmd           *exec.Cmd
 	cond          *sync.Cond
 	isReadingDone bool
@@ -52,14 +53,16 @@ func (job *Job) read(pipe io.ReadCloser) {
 	}
 }
 
-func (job *Job) Status() (*RunningJobStatus, *StoppedJobStatus) {
+func (job *Job) Status() JobStatus {
 	job.Lock()
 	defer job.Unlock()
+	js := JobStatus{ID: job.Id, Logs: len(job.logs), Command: job.Command}
 	if job.cmd.ProcessState.Exited() {
-		return nil, &StoppedJobStatus{JobStatus: JobStatus{ID: job.Id}, ExitCode: job.cmd.ProcessState.ExitCode()}
+		js.Stopped = &StoppedJobStatus{ExitCode: job.cmd.ProcessState.ExitCode()}
 	} else {
-		return &RunningJobStatus{JobStatus: JobStatus{ID: job.Id}}, nil
+		js.Pending = &PendingJobStatus{CPUPercentage: 1.0} // TODO: implement
 	}
+	return js
 }
 
 // Returning 0 length indicates that there are no more logs to return

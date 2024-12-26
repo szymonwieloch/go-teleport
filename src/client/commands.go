@@ -56,7 +56,7 @@ func handleStop(addr string, cmd stopCmd) {
 	log.Println("Stopping job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
-	taskID := teleportproto.TaskId{Uuid: string(cmd.JobID)}
+	taskID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	ctx, cancel := defaultContext()
 	defer cancel()
 	st, err := client.Stop(ctx, &taskID)
@@ -76,8 +76,8 @@ func handleList(addr string, cmd listCmd) {
 	if err != nil {
 		log.Fatalf("could not list jobs: %v", err)
 	}
-	for _, task := range jobs.Tasks {
-		log.Println(task.Id, task.TaskStatus) // TODO: print more details
+	for _, job := range jobs.Jobs {
+		log.Println(job.Id, job.JobStatus) // TODO: print more details
 	}
 }
 
@@ -87,12 +87,12 @@ func handleStatus(addr string, cmd statusCmd) {
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
-	taskID := teleportproto.TaskId{Uuid: string(cmd.JobID)}
+	taskID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	status, err := client.GetStatus(ctx, &taskID)
 	if err != nil {
 		log.Fatalf("could not get status for the job: %v", err)
 	}
-	log.Println("Status for job", status.Id, "is", status.TaskStatus)
+	log.Println("Status for job", status.Id, "is", status.JobStatus)
 }
 
 func handleLog(addr string, cmd logCmd) {
@@ -101,8 +101,8 @@ func handleLog(addr string, cmd logCmd) {
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
-	taskID := teleportproto.TaskId{Uuid: string(cmd.JobID)}
-	stream, err := client.Logs(ctx, &taskID)
+	jobID := teleportproto.JobId{Uuid: string(cmd.JobID)}
+	stream, err := client.Logs(ctx, &jobID)
 	if err != nil {
 		log.Fatalf("could not get logs for the job: %v", err)
 	}
@@ -114,11 +114,14 @@ func handleLog(addr string, cmd logCmd) {
 		} else if err != nil {
 			log.Fatalf("could not receive logs: %v", err)
 		}
-		if resp.Stderr != nil {
-			fmt.Fprintln(os.Stderr, resp.Stderr.Text)
-		}
-		if resp.Stdout != nil {
-			fmt.Println(resp.Stdout.Text)
+		if resp.Text != "" {
+			switch resp.Src {
+			case teleportproto.LogSource_LS_STDOUT:
+				fmt.Print(resp.Text)
+
+			case teleportproto.LogSource_LS_STDERR:
+				fmt.Fprint(os.Stderr, resp.Text)
+			}
 		}
 	}
 }

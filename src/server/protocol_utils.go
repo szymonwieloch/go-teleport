@@ -5,29 +5,19 @@ import (
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
 )
 
-func startedJobStatus(status *jobs.RunningJobStatus) *teleportproto.StartedTask {
-	return &teleportproto.StartedTask{Id: &teleportproto.TaskId{Uuid: string(status.ID)}}
-}
-
-func stoppedJobStatus(status *jobs.StoppedJobStatus) *teleportproto.StoppedTask {
-	return &teleportproto.StoppedTask{ErrorCode: int32(status.ExitCode)}
-}
-
-func jobStatus(running *jobs.RunningJobStatus, stopped *jobs.StoppedJobStatus) *teleportproto.Status {
-	var js jobs.JobStatus
-	if running != nil {
-		js = running.JobStatus
+func jobStatus(status jobs.JobStatus) *teleportproto.JobStatus {
+	result := teleportproto.JobStatus{
+		Id:      &teleportproto.JobId{Uuid: string(status.ID)},
+		Started: nil, // TODO
+		Logs:    uint32(status.Logs),
+		Command: &teleportproto.Command{Command: status.Command},
+	}
+	if status.Stopped != nil {
+		result.Details = &teleportproto.JobStatus_Stopped{Stopped: &teleportproto.StoppedJobStatus{ErrorCode: int32(status.Stopped.ExitCode), Stopped: nil}}
 	} else {
-		js = stopped.JobStatus
+		result.Details = &teleportproto.JobStatus_Pending{Pending: &teleportproto.PendingJobStatus{CpuPerc: status.Pending.CPUPercentage}}
 	}
-	result := teleportproto.Status{
-		Id: &teleportproto.TaskId{Uuid: string(js.ID)},
-	}
-	if running == nil {
-		result.TaskStatus = &teleportproto.Status_Stopped{Stopped: stoppedJobStatus(stopped)}
-	} else {
-		result.TaskStatus = &teleportproto.Status_Started{Started: startedJobStatus(running)}
-	}
+
 	return &result
 
 }
