@@ -8,7 +8,7 @@ type listCmd struct {
 }
 
 type startCmd struct {
-	Command string `arg:"positional,required" help:"Command to run"`
+	Command []string `arg:"positional,required" help:"Command to run"`
 }
 
 type stopCmd struct {

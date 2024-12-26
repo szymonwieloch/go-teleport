@@ -3,6 +3,7 @@ package jobs
 import (
 	"bufio"
 	"io"
+	"log"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type logs struct {
 	cond         *sync.Cond
 	readingCoros int
 	logs         []LogEntry
+	jobID        JobID
 }
 
 func (logs *logs) read(pipe io.ReadCloser, stdout bool) {
@@ -29,6 +31,11 @@ func (logs *logs) read(pipe io.ReadCloser, stdout bool) {
 			logs.readingCoros -= 1
 			logs.Unlock()
 			logs.cond.Broadcast()
+			name := "stderr"
+			if stdout {
+				name = "stdout"
+			}
+			log.Println("pipe", name, "of job", logs.jobID, "got closed")
 			break
 		}
 		entry := LogEntry{Line: line, Timestamp: time.Now(), Stdout: stdout}
@@ -55,8 +62,8 @@ func (logs *logs) size() int {
 	return len(logs.logs)
 }
 
-func newLogs(stdout, stderr io.ReadCloser) *logs {
-	result := &logs{readingCoros: 2}
+func newLogs(stdout, stderr io.ReadCloser, jobID JobID) *logs {
+	result := &logs{readingCoros: 2, jobID: jobID}
 	result.cond = sync.NewCond(result)
 	go result.read(stdout, true)
 	go result.read(stderr, false)

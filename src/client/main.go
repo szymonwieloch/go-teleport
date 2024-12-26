@@ -10,6 +10,5 @@ import "fmt"
 func main() {
 	fmt.Println("Teleport client")
 	args := parseArgs()
-	fmt.Println(args)
 	execute(args)
 }

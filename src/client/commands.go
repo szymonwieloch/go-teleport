@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+const separator = "------------------------------------------------------------"
 
 func execute(args args) {
 	if args.Start != nil {
@@ -32,28 +34,28 @@ func execute(args args) {
 func createClient(addr string) (teleportproto.RemoteExecutorClient, func()) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		fatalError(err, "did not connect to the server")
 	}
 	return teleportproto.NewRemoteExecutorClient(conn), func() { conn.Close() }
 }
 
 func handleStart(addr string, cmd startCmd) {
-	log.Println("Starting command", cmd.Command)
+	fmt.Println("Starting command:", strings.Join(cmd.Command, " "))
 
 	client, close := createClient(addr)
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
-	req := teleportproto.Command{Command: []string{cmd.Command}}
+	req := teleportproto.Command{Command: cmd.Command}
 	st, err := client.Start(ctx, &req)
 	if err != nil {
-		log.Fatalf("could not start a new command: %v", err)
+		fatalError(err, "could not start a new command")
 	}
-	log.Println("Started job", st.Id)
+	fmt.Println("Started job", st.Id.Uuid)
 }
 
 func handleStop(addr string, cmd stopCmd) {
-	log.Println("Stopping job", cmd.JobID)
+	fmt.Println("Stopping job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
 	taskID := teleportproto.JobId{Uuid: string(cmd.JobID)}
@@ -61,28 +63,30 @@ func handleStop(addr string, cmd stopCmd) {
 	defer cancel()
 	st, err := client.Stop(ctx, &taskID)
 	if err != nil {
-		log.Fatalf("could not stop the job: %v", err)
+		fatalError(err, "could not stop the job")
 	}
-	log.Println("Stopped job", cmd.JobID, "the error code was", st.ErrorCode)
+	fmt.Println("Stopped job")
+	printStatus(st)
 }
 
 func handleList(addr string, cmd listCmd) {
-	log.Println("Listing jobs")
+	fmt.Println("Listing jobs")
 	client, close := createClient(addr)
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
-	jobs, err := client.List(ctx, &empty.Empty{})
+	list, err := client.List(ctx, &empty.Empty{})
 	if err != nil {
-		log.Fatalf("could not list jobs: %v", err)
+		fatalError(err, "could not list jobs")
 	}
-	for _, job := range jobs.Jobs {
-		log.Println(job.Id, job.JobStatus) // TODO: print more details
+	for _, status := range list.Jobs {
+		fmt.Println(separator)
+		printStatus(status)
 	}
 }
 
 func handleStatus(addr string, cmd statusCmd) {
-	log.Println("Showing status for job", cmd.JobID)
+	fmt.Println("Showing status for job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
 	ctx, cancel := defaultContext()
@@ -90,13 +94,13 @@ func handleStatus(addr string, cmd statusCmd) {
 	taskID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	status, err := client.GetStatus(ctx, &taskID)
 	if err != nil {
-		log.Fatalf("could not get status for the job: %v", err)
+		fatalError(err, "could not get status for the job")
 	}
-	log.Println("Status for job", status.Id, "is", status.JobStatus)
+	printStatus(status)
 }
 
 func handleLog(addr string, cmd logCmd) {
-	log.Println("Showing logs for job", cmd.JobID)
+	fmt.Println("Showing logs for job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
 	ctx, cancel := defaultContext()
@@ -104,7 +108,7 @@ func handleLog(addr string, cmd logCmd) {
 	jobID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	stream, err := client.Logs(ctx, &jobID)
 	if err != nil {
-		log.Fatalf("could not get logs for the job: %v", err)
+		fatalError(err, "could not get logs for the job")
 	}
 	for {
 		resp, err := stream.Recv()
@@ -112,15 +116,15 @@ func handleLog(addr string, cmd logCmd) {
 			fmt.Println("== End of logs ==")
 			return
 		} else if err != nil {
-			log.Fatalf("could not receive logs: %v", err)
+			fatalError(err, "could not receive logs")
 		}
 		if resp.Text != "" {
 			switch resp.Src {
 			case teleportproto.LogSource_LS_STDOUT:
-				fmt.Print(resp.Text)
+				fmt.Print(colorGreen + resp.Text + colorReset)
 
 			case teleportproto.LogSource_LS_STDERR:
-				fmt.Fprint(os.Stderr, resp.Text)
+				fmt.Fprint(os.Stderr, colorRed+resp.Text)
 			}
 		}
 	}
@@ -129,4 +133,25 @@ func handleLog(addr string, cmd logCmd) {
 func defaultContext() (context.Context, func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	return ctx, cancel
+}
+
+func printStatus(status *teleportproto.JobStatus) {
+	fmt.Println("Job ID :", status.Id.Uuid)
+	fmt.Println("Command:", strings.Join(status.Command.Command, " "))
+	fmt.Println("Started:", status.Started.AsTime())
+	fmt.Println("Logs   :", status.Logs)
+	if status.Details != nil {
+		switch details := status.Details.(type) {
+		case *teleportproto.JobStatus_Stopped:
+			fmt.Println("Stopped:", details.Stopped.Stopped.AsTime())
+			fmt.Println("E. code:", details.Stopped.ErrorCode)
+		case *teleportproto.JobStatus_Pending:
+			fmt.Println("CPU %  :", details.Pending.CpuPerc)
+		}
+	}
+}
+
+func fatalError(err error, msg string) {
+	fmt.Fprintf(os.Stderr, msg+": %v\n", err)
+	os.Exit(1)
 }

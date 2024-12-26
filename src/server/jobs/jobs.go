@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"errors"
+	"log"
 	"sync"
 )
 
@@ -17,6 +18,7 @@ type Jobs struct {
 func (jobs *Jobs) Create(command []string) (*Job, error) {
 	j, err := newJob(command)
 	if err != nil {
+		log.Println("Could not create a job", err)
 		return nil, err
 	}
 	jobs.mutex.Lock()
@@ -54,4 +56,8 @@ func (jobs *Jobs) List() []*Job {
 		result = append(result, job)
 	}
 	return result
+}
+
+func NewJobs() *Jobs {
+	return &Jobs{pending: make(map[JobID]*Job)}
 }

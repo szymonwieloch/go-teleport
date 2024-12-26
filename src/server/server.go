@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 
@@ -16,7 +17,11 @@ import (
 
 type server struct {
 	teleportproto.UnimplementedRemoteExecutorServer
-	jobs jobs.Jobs
+	jobs *jobs.Jobs
+}
+
+func NewServer() *server {
+	return &server{jobs: jobs.NewJobs()}
 }
 
 func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*teleportproto.JobStatus, error) {
@@ -97,8 +102,9 @@ func startServer(addr string) {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+	fmt.Println("Server started at", addr)
 	s := grpc.NewServer()
-	teleportproto.RegisterRemoteExecutorServer(s, &server{})
+	teleportproto.RegisterRemoteExecutorServer(s, NewServer())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
