@@ -15,6 +15,8 @@ type Jobs struct {
 	mutex   sync.Mutex
 }
 
+// Create creates a new job with the given command.
+// Adds it to the internal collection.
 func (jobs *Jobs) Create(command []string) (*Job, error) {
 	j, err := newJob(command)
 	if err != nil {
@@ -27,12 +29,16 @@ func (jobs *Jobs) Create(command []string) (*Job, error) {
 	return j, nil
 }
 
+// Find returns a job by its ID.
 func (jobs *Jobs) Find(id JobID) *Job {
 	jobs.mutex.Lock()
 	defer jobs.mutex.Unlock()
 	return jobs.pending[id]
 }
 
+// Stop stops a job by its ID.
+// Job is removed from the collection.
+// On success Job instance is returned and can be used to obtain job information.
 func (jobs *Jobs) Stop(id JobID) (*Job, error) {
 	job := jobs.Find(id)
 	if job == nil {
@@ -48,6 +54,7 @@ func (jobs *Jobs) Stop(id JobID) (*Job, error) {
 	return job, nil
 }
 
+// Creates a snapshot of the current collection of the jobs.
 func (jobs *Jobs) List() []*Job {
 	jobs.mutex.Lock()
 	defer jobs.mutex.Unlock()
@@ -58,6 +65,18 @@ func (jobs *Jobs) List() []*Job {
 	return result
 }
 
+// Kills all running processes.
+// Does not remove processes from the collection.
+// Does not wait until processes fully complete.
+func (jobs *Jobs) KillAll() {
+	jobs.mutex.Lock()
+	defer jobs.mutex.Unlock()
+	for _, job := range jobs.pending {
+		job.kill()
+	}
+}
+
+// NewJobs creates a new collection of jobs.
 func NewJobs() *Jobs {
 	return &Jobs{pending: make(map[JobID]*Job)}
 }

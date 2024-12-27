@@ -24,33 +24,38 @@ type logs struct {
 
 func (logs *logs) read(pipe io.ReadCloser, stdout bool) {
 	reader := bufio.NewReader(pipe)
+	name := "stderr"
+	if stdout {
+		name = "stdout"
+	}
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			logs.Lock()
-			logs.readingCoros -= 1
-			logs.Unlock()
-			logs.cond.Broadcast()
-			name := "stderr"
-			if stdout {
-				name = "stdout"
-			}
 			log.Println("pipe", name, "of job", logs.jobID, "got closed")
 			break
 		}
+		log.Println("Job", logs.jobID, "got log on", name, ":", line)
 		entry := LogEntry{Line: line, Timestamp: time.Now(), Stdout: stdout}
-		logs.Lock()
-		logs.logs = append(logs.logs, entry)
-		logs.Unlock()
-		logs.cond.Broadcast()
+		logs.append(entry)
 	}
+	logs.Lock()
+	defer logs.Unlock()
+	logs.readingCoros -= 1
+	logs.cond.Broadcast()
+}
+
+func (logs *logs) append(entry LogEntry) {
+	logs.Lock()
+	defer logs.Unlock()
+	logs.logs = append(logs.logs, entry)
+	logs.cond.Broadcast()
 }
 
 // Returning 0 length indicates that there are no more logs to return
 func (logs *logs) get(start, maxCount int) []LogEntry {
 	logs.Lock()
 	defer logs.Unlock()
-	for start <= len(logs.logs) && logs.readingCoros > 0 {
+	for start >= len(logs.logs) && logs.readingCoros > 0 {
 		logs.cond.Wait()
 	}
 	return logs.logs[start:min(start+maxCount, len(logs.logs))]

@@ -103,8 +103,8 @@ func handleLog(addr string, cmd logCmd) {
 	fmt.Println("Showing logs for job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
-	ctx, cancel := defaultContext()
-	defer cancel()
+	ctx := context.Background() //defaultContext() cancel :=
+	// defer cancel()
 	jobID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	stream, err := client.Logs(ctx, &jobID)
 	if err != nil {
