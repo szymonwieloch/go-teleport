@@ -1,10 +1,10 @@
+// Handlers of all command line commands.
 package main
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -16,6 +16,7 @@ import (
 
 const separator = "------------------------------------------------------------"
 
+// Executes command using parsed arguments
 func execute(args args) {
 	if args.Start != nil {
 		handleStart(args.Address, *args.Start)
@@ -31,6 +32,7 @@ func execute(args args) {
 
 }
 
+// Creates instance of a client
 func createClient(addr string) (teleportproto.RemoteExecutorClient, func()) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -39,6 +41,7 @@ func createClient(addr string) (teleportproto.RemoteExecutorClient, func()) {
 	return teleportproto.NewRemoteExecutorClient(conn), func() { conn.Close() }
 }
 
+// Handles the "start" command - start remote process
 func handleStart(addr string, cmd startCmd) {
 	fmt.Println("Starting command:", strings.Join(cmd.Command, " "))
 
@@ -54,6 +57,7 @@ func handleStart(addr string, cmd startCmd) {
 	fmt.Println("Started job", st.Id.Uuid)
 }
 
+// Handles the "stop" command - kills the remote process and obtains its status
 func handleStop(addr string, cmd stopCmd) {
 	fmt.Println("Stopping job", cmd.JobID)
 	client, close := createClient(addr)
@@ -69,6 +73,7 @@ func handleStop(addr string, cmd stopCmd) {
 	printStatus(st)
 }
 
+// Handles the "list" command - list statuses of running jobs
 func handleList(addr string, cmd listCmd) {
 	fmt.Println("Listing jobs")
 	client, close := createClient(addr)
@@ -85,6 +90,7 @@ func handleList(addr string, cmd listCmd) {
 	}
 }
 
+// Handles the "sttus" taks - shows status of the remote job
 func handleStatus(addr string, cmd statusCmd) {
 	fmt.Println("Showing status for job", cmd.JobID)
 	client, close := createClient(addr)
@@ -99,12 +105,12 @@ func handleStatus(addr string, cmd statusCmd) {
 	printStatus(status)
 }
 
+// Handles the "log" command - streams logs of the remote job
 func handleLog(addr string, cmd logCmd) {
 	fmt.Println("Showing logs for job", cmd.JobID)
 	client, close := createClient(addr)
 	defer close()
-	ctx := context.Background() //defaultContext() cancel :=
-	// defer cancel()
+	ctx := context.Background()
 	jobID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	stream, err := client.Logs(ctx, &jobID)
 	if err != nil {
@@ -119,22 +125,22 @@ func handleLog(addr string, cmd logCmd) {
 			fatalError(err, "could not receive logs")
 		}
 		if resp.Text != "" {
-			switch resp.Src {
-			case teleportproto.LogSource_LS_STDOUT:
-				fmt.Print(colorGreen + resp.Text + colorReset)
-
-			case teleportproto.LogSource_LS_STDERR:
-				fmt.Fprint(os.Stderr, colorRed+resp.Text)
+			stderr := false
+			if resp.Src == teleportproto.LogSource_LS_STDERR {
+				stderr = true
 			}
+			printLog(resp.Text, resp.Timestamp.AsTime(), stderr)
 		}
 	}
 }
 
+// Most request should complete in 1 second
 func defaultContext() (context.Context, func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	return ctx, cancel
 }
 
+// Prints status of the remove job.
 func printStatus(status *teleportproto.JobStatus) {
 	fmt.Println("Job ID :", status.Id.Uuid)
 	fmt.Println("Command:", strings.Join(status.Command.Command, " "))
@@ -149,9 +155,4 @@ func printStatus(status *teleportproto.JobStatus) {
 			fmt.Println("CPU %  :", details.Pending.CpuPerc)
 		}
 	}
-}
-
-func fatalError(err error, msg string) {
-	fmt.Fprintf(os.Stderr, msg+": %v\n", err)
-	os.Exit(1)
 }

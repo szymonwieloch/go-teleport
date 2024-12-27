@@ -1,3 +1,4 @@
+// Definitions of struct that represent snapshot of status of a job
 package jobs
 
 import "time"

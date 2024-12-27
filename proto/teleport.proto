@@ -5,10 +5,15 @@ package teleport;
 option go_package = "proto/teleportproto";
 
 service RemoteExecutor {
+    // Starts a new commmand remotely
     rpc Start (Command) returns (JobStatus);
+    // Stopps the started command
     rpc Stop (JobId) returns (JobStatus);
+    // Starts streaming of the command logs
     rpc Logs (JobId) returns (stream Log);
+    // Lists all running commands
     rpc List (google.protobuf.Empty) returns (JobList);
+    // Gets status of the specific command
     rpc GetStatus (JobId) returns (JobStatus);
     
 }
@@ -35,7 +40,6 @@ message JobStatus {
         StoppedJobStatus stopped = 5;
         PendingJobStatus pending = 6;
     }
-
 }
 
 
@@ -47,7 +51,6 @@ message StoppedJobStatus{
 message PendingJobStatus{
     float cpu_perc = 1;
 }
-
 
 message Log{
     string text = 1;

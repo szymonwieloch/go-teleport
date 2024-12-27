@@ -12,7 +12,7 @@ func TestJobStatus(t *testing.T) {
 
 	assert.NotNil(t, js)
 	status := js.Status()
-	assert.Equal(t, js.Id, status.ID)
+	assert.Equal(t, js.ID, status.ID)
 	assert.Equal(t, js.Command, status.Command)
 	assert.Equal(t, js.Started, status.Started)
 	assert.Nil(t, status.Stopped)

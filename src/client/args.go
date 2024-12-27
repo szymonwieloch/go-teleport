@@ -1,3 +1,4 @@
+// Definitions of structures that map to the command line arguments
 package main
 
 import "github.com/alexflint/go-arg"
@@ -25,13 +26,14 @@ type statusCmd struct {
 
 type args struct {
 	Address string     `arg:"env,required" help:"Address of the server"`
-	Start   *startCmd  `arg:"subcommand:start" help:"Starts a new remote task"`
-	Stop    *stopCmd   `arg:"subcommand:stop" help:"Stops a remote task"`
-	List    *listCmd   `arg:"subcommand:list" help:"Lists all remote tasks"`
-	Log     *logCmd    `arg:"subcommand:log" help:"Shows logs of the remote task"`
-	Status  *statusCmd `arg:"subcommand:status" help:"Prints status of the remote task"`
+	Start   *startCmd  `arg:"subcommand:start" help:"Starts a new remote job"`
+	Stop    *stopCmd   `arg:"subcommand:stop" help:"Stops a remote job"`
+	List    *listCmd   `arg:"subcommand:list" help:"Lists all remote job"`
+	Log     *logCmd    `arg:"subcommand:log" help:"Shows logs of the remote job"`
+	Status  *statusCmd `arg:"subcommand:status" help:"Prints status of the remote job"`
 }
 
+// Parses command line arguments
 func parseArgs() args {
 	var result args
 	p := arg.MustParse(&result)

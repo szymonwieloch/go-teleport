@@ -1,3 +1,4 @@
+// Collection of jobs
 package jobs
 
 import (
@@ -8,8 +9,11 @@ import (
 
 var ErrNotFound = errors.New("Job was not found")
 
+// Type safe Job identifier
+// Actually UUID
 type JobID string
 
+// Thread safe collection of jobs
 type Jobs struct {
 	pending map[JobID]*Job
 	mutex   sync.Mutex
@@ -25,7 +29,7 @@ func (jobs *Jobs) Create(command []string) (*Job, error) {
 	}
 	jobs.mutex.Lock()
 	defer jobs.mutex.Unlock()
-	jobs.pending[j.Id] = j
+	jobs.pending[j.ID] = j
 	return j, nil
 }
 
@@ -66,7 +70,7 @@ func (jobs *Jobs) List() []*Job {
 }
 
 // Kills all running processes.
-// Does not remove processes from the collection.
+// Does not remove processes from the collection (cleaned by GC anyway).
 // Does not wait until processes fully complete.
 func (jobs *Jobs) KillAll() {
 	jobs.mutex.Lock()

@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// Maps job status as reported by a job to the gRPC equivalent
 func jobStatus(status jobs.JobStatus) *teleportproto.JobStatus {
 	result := teleportproto.JobStatus{
 		Id:      &teleportproto.JobId{Uuid: string(status.ID)},

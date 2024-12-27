@@ -13,6 +13,6 @@ func TestJobsFind(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, j1)
 
-	j2 := js.Find(j1.Id)
+	j2 := js.Find(j1.ID)
 	assert.Equal(t, j1, j2)
 }

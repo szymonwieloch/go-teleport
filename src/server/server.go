@@ -1,3 +1,4 @@
+// Implementation of the gRPC server
 package main
 
 import (
@@ -15,14 +16,33 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// The main server type
 type server struct {
 	teleportproto.UnimplementedRemoteExecutorServer
 	jobs *jobs.Jobs
 }
 
+// Creates a new instant of a server
 func NewServer() *server {
 	return &server{jobs: jobs.NewJobs()}
 }
+
+// Starts server on the provided domain:port address
+func startServer(addr string) {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	fmt.Println("Server started at", addr)
+	s := grpc.NewServer()
+	teleportproto.RegisterRemoteExecutorServer(s, NewServer())
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
+// The following is implementation of the teleportproto.RemoteExecutorServer interface
+var _ teleportproto.RemoteExecutorServer = (*server)(nil)
 
 func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*teleportproto.JobStatus, error) {
 	log.Println("Starting command", req.Command)
@@ -95,17 +115,4 @@ func (s *server) GetStatus(ctx context.Context, req *teleportproto.JobId) (*tele
 		return nil, status.Error(codes.NotFound, "id was not found")
 	}
 	return jobStatus(job.Status()), nil
-}
-
-func startServer(addr string) {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	fmt.Println("Server started at", addr)
-	s := grpc.NewServer()
-	teleportproto.RegisterRemoteExecutorServer(s, NewServer())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
 }
