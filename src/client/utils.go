@@ -28,7 +28,7 @@ func printLog(log string, timestamp time.Time, stderr bool) {
 		color = colorRed
 	}
 
-	fmt.Fprintf(output, "%s%s: %s%s%s", colorCyan, timeStr, color, log, colorReset)
+	fmt.Fprintf(output, "%s%s: %s%s%s\n", colorCyan, timeStr, color, log, colorReset)
 }
 
 // Prints error and exits

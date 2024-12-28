@@ -63,6 +63,13 @@ func (job *Job) isStopped() bool {
 	return job.Stopped != time.Time{}
 }
 
+// Like stop() but thread safe and public
+func (job *Job) IsStopped() bool {
+	job.mutex.Lock()
+	defer job.mutex.Unlock()
+	return job.isStopped()
+}
+
 // Returns snapshot of status of the job.
 // Thread safe.
 func (job *Job) Status() JobStatus {

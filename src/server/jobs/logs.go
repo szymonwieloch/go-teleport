@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"io"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,6 +39,7 @@ func (logs *logs) read(pipe io.ReadCloser, stdout bool) {
 			log.Println("pipe", name, "of job", logs.jobID, "got closed")
 			break
 		}
+		line = strings.TrimSuffix(line, "\n")
 		entry := LogEntry{Line: line, Timestamp: time.Now(), Stdout: stdout}
 		logs.append(entry)
 	}
