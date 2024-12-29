@@ -55,4 +55,3 @@ telecli --help
 - Create integration tests
 - Make README and design consistent
 - Add limitation of memory and CPU for the child jobs.
-- Add authentication and authorization
