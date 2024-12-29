@@ -8,6 +8,6 @@ import "fmt"
 func main() {
 	fmt.Println("Teleport server")
 	args := parseArgs()
-	startServer(args.Address)
+	startServer(args)
 
 }

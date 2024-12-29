@@ -26,6 +26,8 @@ type statusCmd struct {
 
 type args struct {
 	Address string     `arg:"env,required" help:"Address of the server"`
+	Secret  string     `arg:"env" help:"A secret for authentication, if desired"`
+	CaPath  string     `arg:"env" help:"Path to a CA certificate for the TLS connection, if desired"`
 	Start   *startCmd  `arg:"subcommand:start" help:"Starts a new remote job"`
 	Stop    *stopCmd   `arg:"subcommand:stop" help:"Stops a remote job"`
 	List    *listCmd   `arg:"subcommand:list" help:"Lists all remote job"`
@@ -39,6 +41,9 @@ func parseArgs() args {
 	p := arg.MustParse(&result)
 	if result.Start == nil && result.Stop == nil && result.List == nil && result.Log == nil && result.Status == nil {
 		p.Fail("Please choose subcommand")
+	}
+	if (result.Secret == "") != (result.CaPath == "") {
+		p.Fail("Both a secret and CA certificate path need to be configured")
 	}
 	return result
 }

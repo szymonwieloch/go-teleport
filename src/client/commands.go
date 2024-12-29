@@ -10,8 +10,11 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/szymonwieloch/go-teleport/client/proto/teleportproto"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 const separator = "------------------------------------------------------------"
@@ -19,22 +22,41 @@ const separator = "------------------------------------------------------------"
 // Executes command using parsed arguments
 func execute(args args) {
 	if args.Start != nil {
-		handleStart(args.Address, *args.Start)
+		handleStart(args, *args.Start)
 	} else if args.Stop != nil {
-		handleStop(args.Address, *args.Stop)
+		handleStop(args, *args.Stop)
 	} else if args.List != nil {
-		handleList(args.Address, *args.List)
+		handleList(args, *args.List)
 	} else if args.Log != nil {
-		handleLog(args.Address, *args.Log)
+		handleLog(args, *args.Log)
 	} else if args.Status != nil {
-		handleStatus(args.Address, *args.Status)
+		handleStatus(args, *args.Status)
 	}
 
 }
 
 // Creates instance of a client
-func createClient(addr string) (teleportproto.RemoteExecutorClient, func()) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// On failure stops the application
+func createClient(args args) (teleportproto.RemoteExecutorClient, func()) {
+
+	var opts []grpc.DialOption
+	if args.Secret == "" {
+		opts = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	} else {
+		perRPC := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: args.Secret,
+		})}
+		creds, err := credentials.NewClientTLSFromFile(args.CaPath, "x.test.example.com") // TODO
+		if err != nil {
+			fatalError(err, "failed to load credentials")
+		}
+		opts = []grpc.DialOption{
+			grpc.WithPerRPCCredentials(perRPC),
+			grpc.WithTransportCredentials(creds),
+		}
+	}
+
+	conn, err := grpc.NewClient(args.Address, opts...)
 	if err != nil {
 		fatalError(err, "did not connect to the server")
 	}
@@ -42,10 +64,10 @@ func createClient(addr string) (teleportproto.RemoteExecutorClient, func()) {
 }
 
 // Handles the "start" command - start remote process
-func handleStart(addr string, cmd startCmd) {
+func handleStart(args args, cmd startCmd) {
 	fmt.Println("Starting command:", strings.Join(cmd.Command, " "))
 
-	client, close := createClient(addr)
+	client, close := createClient(args)
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
@@ -58,9 +80,9 @@ func handleStart(addr string, cmd startCmd) {
 }
 
 // Handles the "stop" command - kills the remote process and obtains its status
-func handleStop(addr string, cmd stopCmd) {
+func handleStop(args args, cmd stopCmd) {
 	fmt.Println("Stopping job", cmd.JobID)
-	client, close := createClient(addr)
+	client, close := createClient(args)
 	defer close()
 	taskID := teleportproto.JobId{Uuid: string(cmd.JobID)}
 	ctx, cancel := defaultContext()
@@ -74,9 +96,9 @@ func handleStop(addr string, cmd stopCmd) {
 }
 
 // Handles the "list" command - list statuses of running jobs
-func handleList(addr string, cmd listCmd) {
+func handleList(args args, cmd listCmd) {
 	fmt.Println("Listing jobs")
-	client, close := createClient(addr)
+	client, close := createClient(args)
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
@@ -91,9 +113,9 @@ func handleList(addr string, cmd listCmd) {
 }
 
 // Handles the "sttus" taks - shows status of the remote job
-func handleStatus(addr string, cmd statusCmd) {
+func handleStatus(args args, cmd statusCmd) {
 	fmt.Println("Showing status for job", cmd.JobID)
-	client, close := createClient(addr)
+	client, close := createClient(args)
 	defer close()
 	ctx, cancel := defaultContext()
 	defer cancel()
@@ -106,9 +128,9 @@ func handleStatus(addr string, cmd statusCmd) {
 }
 
 // Handles the "log" command - streams logs of the remote job
-func handleLog(addr string, cmd logCmd) {
+func handleLog(args args, cmd logCmd) {
 	fmt.Println("Showing logs for job", cmd.JobID)
-	client, close := createClient(addr)
+	client, close := createClient(args)
 	defer close()
 	ctx := context.Background()
 	jobID := teleportproto.JobId{Uuid: string(cmd.JobID)}

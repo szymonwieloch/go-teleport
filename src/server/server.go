@@ -28,17 +28,28 @@ func NewServer() *server {
 }
 
 // Starts server on the provided domain:port address
-func startServer(addr string) {
-	lis, err := net.Listen("tcp", addr)
+func startServer(args args) error {
+	lis, err := net.Listen("tcp", args.Address)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %v", err)
 	}
-	fmt.Println("Server started at", addr)
-	s := grpc.NewServer()
+	fmt.Println("Server started at", args.Address)
+
+	opts := []grpc.ServerOption{}
+
+	if args.AuthKey != "" {
+		opts, err = configOAuth(opts, args)
+		if err != nil {
+			return err
+		}
+	}
+
+	s := grpc.NewServer(opts...)
 	teleportproto.RegisterRemoteExecutorServer(s, NewServer())
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		return fmt.Errorf("failed to serve: %v", err)
 	}
+	return nil
 }
 
 // The following is implementation of the teleportproto.RemoteExecutorServer interface
@@ -48,7 +59,7 @@ func (s *server) Start(ctx context.Context, req *teleportproto.Command) (*telepo
 	log.Println("Starting command", req.Command)
 	job, err := s.jobs.Create(req.Command)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "could not start the process")
+		return nil, errCouldNotStartProcess
 	}
 	return jobStatus(job.Status()), nil
 }
@@ -58,7 +69,7 @@ func (s *server) Stop(ctx context.Context, req *teleportproto.JobId) (*teleportp
 	job, err := s.jobs.Stop(jobs.JobID(req.Uuid))
 	if err != nil {
 		if err == jobs.ErrNotFound {
-			return nil, status.Error(codes.NotFound, "id was not found")
+			return nil, errIDNotFound
 		} else {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -81,7 +92,7 @@ func (s *server) Logs(req *teleportproto.JobId, srv grpc.ServerStreamingServer[t
 	log.Println("Showing logs for job", req.Uuid)
 	job := s.jobs.Find(jobs.JobID(req.Uuid))
 	if job == nil {
-		return status.Error(codes.NotFound, "id was not found")
+		return errIDNotFound
 	}
 	position := 0
 	for {
@@ -112,7 +123,7 @@ func (s *server) GetStatus(ctx context.Context, req *teleportproto.JobId) (*tele
 	log.Println("Showing status for job", req.Uuid)
 	job := s.jobs.Find(jobs.JobID(req.Uuid))
 	if job == nil {
-		return nil, status.Error(codes.NotFound, "id was not found")
+		return nil, errIDNotFound
 	}
 	return jobStatus(job.Status()), nil
 }

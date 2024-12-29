@@ -53,7 +53,6 @@ telecli --help
 # TODO
 - Create unit tests
 - Create integration tests
-- Dockerize
 - Make README and design consistent
 - Add limitation of memory and CPU for the child jobs.
 - Add authentication and authorization
