@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/cgroups"
 	"github.com/google/uuid"
 )
 
@@ -124,20 +125,39 @@ func (job *Job) GetLogs(start, maxCount int) []LogEntry {
 }
 
 // Creates a new job.
-func newJob(command []string) (*Job, error) {
+func newJob(command []string, cgroup cgroups.Cgroup) (*Job, error) {
 	cmd := exec.Command(command[0], command[1:]...)
+	// this is how process should be added to the group before it starts
+	// but there is no API that allows you to obtain this FD.
+	// if cgroup != nil {
+	// 	cmd.SysProcAttr.CgroupFD = cgroup.Fd()
+	// 	cmd.SysProcAttr.UseCgroupFD = true
+	// }
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		stdout.Close()
 		return nil, err
 	}
 
 	err = cmd.Start()
 	if err != nil {
+		stderr.Close()
+		stdout.Close()
 		return nil, err
+	}
+	if cgroup != nil {
+		err = cgroup.Add(cgroups.Process{Pid: cmd.Process.Pid})
+		if err != nil {
+			// cleanup
+			cmd.Process.Kill()
+			stderr.Close()
+			stdout.Close()
+			return nil, err
+		}
 	}
 	id := JobID(uuid.New().String())
 	j := &Job{

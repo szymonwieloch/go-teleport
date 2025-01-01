@@ -8,7 +8,7 @@ import (
 )
 
 func TestJobsFind(t *testing.T) {
-	js := NewJobs()
+	js := NewJobs(nil)
 	assert.NotNil(t, js)
 	j1, err := js.Create([]string{"echo", "hello"})
 	defer j1.stop()
@@ -20,7 +20,7 @@ func TestJobsFind(t *testing.T) {
 }
 
 func TestCreateInvalidJob(t *testing.T) {
-	js := NewJobs()
+	js := NewJobs(nil)
 	assert.NotNil(t, js)
 	j, err := js.Create([]string{"barambaram"})
 	assert.Nil(t, j)
@@ -29,7 +29,7 @@ func TestCreateInvalidJob(t *testing.T) {
 }
 
 func TestStopJobByID(t *testing.T) {
-	js := NewJobs()
+	js := NewJobs(nil)
 	j, err := js.Create([]string{"sleep", "10"})
 	defer j.stop()
 	assert.NoError(t, err)
@@ -41,7 +41,7 @@ func TestStopJobByID(t *testing.T) {
 }
 
 func TestListKillAll(t *testing.T) {
-	js := NewJobs()
+	js := NewJobs(nil)
 	j1, err := js.Create([]string{"sleep", "10"})
 	defer j1.stop()
 	assert.NoError(t, err)

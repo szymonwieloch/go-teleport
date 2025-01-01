@@ -8,6 +8,7 @@ type args struct {
 	AuthKey  string `arg:"env" help:"Path to a authentication key, if desired"`
 	AuthCert string `arg:"env" help:"Path to a authentication certificate, if desired"`
 	Secret   string `arg:"env" help:"A secret for authentication, if desired"`
+	Limits   bool   `help:"Enable cgroup limits"`
 }
 
 // Either all are empty or all are set

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/containerd/cgroups"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/szymonwieloch/go-teleport/server/jobs"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
@@ -23,15 +24,28 @@ type server struct {
 }
 
 // Creates a new instant of a server
-func NewServer() *server {
-	return &server{jobs: jobs.NewJobs()}
+func NewServer(args args) (*server, error) {
+	var cg cgroups.Cgroup
+	var err error
+	if args.Limits {
+		cg, err = jobs.GetOrCreateGroup()
+		if err != nil {
+			return nil, fmt.Errorf("could not create cgroup: %w", err)
+		}
+	}
+	j := jobs.NewJobs(cg)
+	return &server{jobs: j}, nil
+}
+
+func (s *server) Close() {
+	s.jobs.KillAll()
 }
 
 // Starts server on the provided domain:port address
 func startServer(args args) error {
 	lis, err := net.Listen("tcp", args.Address)
 	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	fmt.Println("Server started at", args.Address)
 
@@ -40,14 +54,20 @@ func startServer(args args) error {
 	if args.AuthKey != "" {
 		opts, err = configOAuth(opts, args)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create server: %w", err)
 		}
 	}
 
-	s := grpc.NewServer(opts...)
-	teleportproto.RegisterRemoteExecutorServer(s, NewServer())
-	if err := s.Serve(lis); err != nil {
-		return fmt.Errorf("failed to serve: %v", err)
+	grpcServer := grpc.NewServer(opts...)
+	server, err := NewServer(args)
+	if err != nil {
+		return err
+
+	}
+	defer server.Close()
+	teleportproto.RegisterRemoteExecutorServer(grpcServer, server)
+	if err := grpcServer.Serve(lis); err != nil {
+		return fmt.Errorf("failed to serve: %w", err)
 	}
 	return nil
 }

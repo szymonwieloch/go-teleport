@@ -8,7 +8,7 @@ import (
 )
 
 func TestJobCreateStop(t *testing.T) {
-	js, err := newJob([]string{"sleep", "10000"})
+	js, err := newJob([]string{"sleep", "10000"}, nil)
 	assert.NoError(t, err)
 	stopTime := time.Now()
 	err = js.stop()
@@ -19,7 +19,7 @@ func TestJobCreateStop(t *testing.T) {
 }
 
 func TestJobStatus(t *testing.T) {
-	js, err := newJob([]string{"sleep", "10"})
+	js, err := newJob([]string{"sleep", "10"}, nil)
 	defer js.kill()
 	assert.NoError(t, err)
 

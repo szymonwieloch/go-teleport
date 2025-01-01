@@ -8,7 +8,7 @@ import (
 )
 
 func TestGetSimpleLog(t *testing.T) {
-	j, err := newJob([]string{"echo", "blah", "uf", "uf!"})
+	j, err := newJob([]string{"echo", "blah", "uf", "uf!"}, nil)
 	defer j.stop()
 	assert.NoError(t, err)
 	logs := j.GetLogs(0, 5)
@@ -21,7 +21,7 @@ func TestGetSimpleLog(t *testing.T) {
 }
 
 func TestGetLogOutsideOfRange(t *testing.T) {
-	j, err := newJob([]string{"echo", "blah", "uf", "uf!"})
+	j, err := newJob([]string{"echo", "blah", "uf", "uf!"}, nil)
 	defer j.stop()
 	assert.NoError(t, err)
 	logs := j.GetLogs(1, 5)
