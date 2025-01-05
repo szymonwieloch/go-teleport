@@ -13,15 +13,20 @@ import (
 func main() {
 	fmt.Println("Teleport server")
 	args := parseArgs()
-	opts := service.ServerOptions{
+	opts := service.ServiceOptions{
 		Address:  args.Address,
 		AuthKey:  args.AuthKey,
 		AuthCert: args.AuthCert,
 		Secret:   args.Secret,
 		Limits:   args.Limits,
 	}
-	err := service.StartServer(opts)
+	srv, err := service.NewService(opts)
 	if err != nil {
 		log.Fatalf("Could not start server: %v", err)
+	}
+	defer srv.Close()
+	err = srv.Serve()
+	if err != nil {
+		log.Fatalf("Error while serving: %v", err)
 	}
 }
