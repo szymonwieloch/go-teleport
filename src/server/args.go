@@ -3,7 +3,7 @@ package main
 
 import "github.com/alexflint/go-arg"
 
-type args struct {
+type Args struct {
 	Address  string `arg:"env,required" help:"Address of the server"`
 	AuthKey  string `arg:"env" help:"Path to a authentication key, if desired"`
 	AuthCert string `arg:"env" help:"Path to a authentication certificate, if desired"`
@@ -26,8 +26,8 @@ func definedTogether(a ...string) bool {
 }
 
 // Parses command line arguments
-func parseArgs() args {
-	var result args
+func parseArgs() Args {
+	var result Args
 	parser := arg.MustParse(&result)
 	if !definedTogether(result.Secret, result.AuthCert, result.AuthKey) {
 		parser.Fail("Authentication key, certificate and secret need to be provided together")

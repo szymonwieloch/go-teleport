@@ -6,12 +6,21 @@ package main
 import (
 	"fmt"
 	"log"
+
+	"github.com/szymonwieloch/go-teleport/server/service"
 )
 
 func main() {
 	fmt.Println("Teleport server")
 	args := parseArgs()
-	err := startServer(args)
+	opts := service.ServerOptions{
+		Address:  args.Address,
+		AuthKey:  args.AuthKey,
+		AuthCert: args.AuthCert,
+		Secret:   args.Secret,
+		Limits:   args.Limits,
+	}
+	err := service.StartServer(opts)
 	if err != nil {
 		log.Fatalf("Could not start server: %v", err)
 	}
