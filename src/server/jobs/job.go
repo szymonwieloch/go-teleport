@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/google/uuid"
 )
 
@@ -125,7 +125,7 @@ func (job *Job) GetLogs(start, maxCount int) []LogEntry {
 }
 
 // Creates a new job.
-func newJob(command []string, cgroup cgroups.Cgroup) (*Job, error) {
+func newJob(command []string, cgroup *cgroup2.Manager) (*Job, error) {
 	cmd := exec.Command(command[0], command[1:]...)
 	// this is how process should be added to the group before it starts
 	// but there is no API that allows you to obtain this FD.
@@ -150,7 +150,7 @@ func newJob(command []string, cgroup cgroups.Cgroup) (*Job, error) {
 		return nil, err
 	}
 	if cgroup != nil {
-		err = cgroup.Add(cgroups.Process{Pid: cmd.Process.Pid})
+		err = cgroup.AddProc(uint64(cmd.Process.Pid))
 		if err != nil {
 			// cleanup
 			cmd.Process.Kill()

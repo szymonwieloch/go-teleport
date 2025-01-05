@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/szymonwieloch/go-teleport/server/jobs"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
@@ -25,15 +25,19 @@ type server struct {
 
 // Creates a new instant of a server
 func NewServer(args args) (*server, error) {
-	var cg cgroups.Cgroup
+	var cg *cgroup2.Manager
 	var err error
 	if args.Limits {
 		cg, err = jobs.GetOrCreateGroup()
 		if err != nil {
 			return nil, fmt.Errorf("could not create cgroup: %w", err)
 		}
+		err = cg.DeleteSystemd()
+		if err != nil {
+			return nil, fmt.Errorf("could not delete cgroup: %w", err)
+		}
 	}
-	j := jobs.NewJobs(cg)
+	j := jobs.NewJobs(nil)
 	return &server{jobs: j}, nil
 }
 

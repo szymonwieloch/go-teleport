@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3/cgroup2"
 )
 
 var ErrNotFound = errors.New("Job was not found")
@@ -18,7 +18,7 @@ type JobID string
 // Thread safe collection of jobs
 type Jobs struct {
 	pending map[JobID]*Job
-	cgroup  cgroups.Cgroup
+	cgroup  *cgroup2.Manager
 	mutex   sync.Mutex
 }
 
@@ -82,12 +82,12 @@ func (jobs *Jobs) KillAll() {
 		job.kill()
 	}
 	if jobs.cgroup != nil {
-		jobs.cgroup.Delete()
+		jobs.cgroup.DeleteSystemd()
 	}
 }
 
 // NewJobs creates a new collection of jobs.
-func NewJobs(cgroup cgroups.Cgroup) *Jobs {
+func NewJobs(cgroup *cgroup2.Manager) *Jobs {
 	return &Jobs{
 		pending: make(map[JobID]*Job),
 		cgroup:  cgroup,

@@ -1,39 +1,34 @@
 package jobs
 
 import (
-	"fmt"
-
-	"github.com/containerd/cgroups"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/containerd/cgroups/v3/cgroup2"
 )
 
-const groupName string = "/teleport"
+const groupName string = "teleport-group.slice"
+const memLimit int64 = 10 * 1024 * 1024
+const cpuPeriod uint64 = 1000000
+const cpuQuota int64 = 200000
 
-func GetOrCreateGroup() (cgroups.Cgroup, error) {
-	// Create a new cgroup group
-	// If the group already exists, return it
-	// Otherwise, create a new group and return it
-	// If the group can't be created, return an error
-
-	control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(groupName))
+func GetOrCreateGroup() (*cgroup2.Manager, error) {
+	m, err := cgroup2.LoadSystemd("/", groupName)
 	if err == nil {
-		return control, nil
+		return m, nil
 	}
-	if err != cgroups.ErrCgroupDeleted && err != cgroups.ErrMountPointNotExist {
-		return nil, fmt.Errorf("could not load cgroup: %w", err)
+
+	memMax := memLimit
+	period := cpuPeriod
+	quota := cpuQuota
+	cpu := cgroup2.CPU{
+		Max: cgroup2.NewCPUMax(&quota, &period),
 	}
-	// Limit the group resources to 20% of CPU and 10 MB of memory
-	// this is a very simplified soludion but adequate for the purpose of this project
-	period := uint64(1000000)
-	quota := int64(200000)
-	mem := int64(10 * 1024 * 1024) // 10MB
-	return cgroups.New(cgroups.V1, cgroups.StaticPath(groupName), &specs.LinuxResources{
-		CPU: &specs.LinuxCPU{
-			Period: &period,
-			Quota:  &quota,
-		},
-		Memory: &specs.LinuxMemory{
-			Limit: &mem,
-		},
-	})
+	mem := cgroup2.Memory{
+		Max: &memMax,
+	}
+	res := cgroup2.Resources{
+		CPU:    &cpu,
+		Memory: &mem,
+	}
+	// dummy PID of -1 is used for creating a "general slice" to be used as a parent cgroup.
+	return cgroup2.NewSystemd("/", groupName, -1, &res)
+
 }
