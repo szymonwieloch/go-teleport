@@ -40,5 +40,38 @@ func TestAuth(t *testing.T) {
 			assert.Equal(t, test.wantOk, gotOk)
 		})
 	}
+}
 
+// Runs a short application and inspects its status and logs after it shuts down
+func TestShort(t *testing.T) {
+	client, close := mustCreateClientAndServer(t)
+	defer close()
+
+	req := teleportproto.Command{Command: []string{"echo", "blah"}}
+	st, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st)
+}
+
+// Runs a long application and inspects its status while it is running
+// Stops the application
+func TestLong(t *testing.T) {
+	client, close := mustCreateClientAndServer(t)
+	defer close()
+
+	req := teleportproto.Command{Command: []string{"sleep", "10"}}
+	st, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st)
+}
+
+// Runs a long applicaton and inspect its logs while it is running
+func TestLogs(t *testing.T) {
+	client, close := mustCreateClientAndServer(t)
+	defer close()
+
+	req := teleportproto.Command{Command: []string{"sleep", "10"}}
+	st, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st)
 }

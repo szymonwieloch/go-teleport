@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
 	"github.com/szymonwieloch/go-teleport/server/service"
 	"golang.org/x/oauth2"
@@ -109,4 +111,42 @@ func mustCreateClient(t *testing.T, secret string) client {
 		t.Fatalf("failed to create client: %v", err)
 	}
 	return cli
+}
+
+// short version for typical use
+func mustCreateClientAndServer(t *testing.T) (client, func()) {
+	closeServer := mustStartServer(t, "")
+	defer func() {
+		if closeServer != nil {
+			closeServer()
+		}
+	}()
+	client := mustCreateClient(t, "")
+	closeServer2 := closeServer
+	closeServer = nil // prevent defer
+	return client, func() {
+		client.close()
+		closeServer2()
+	}
+}
+
+func isRecent(timestamp time.Time) bool {
+	now := time.Now()
+
+	return timestamp.Before(now) && timestamp.After(now.Add(-time.Second))
+}
+
+func isUUID(u string) bool {
+	_, err := uuid.Parse(u)
+	return err == nil
+}
+
+func checkStartedJob(t *testing.T, status *teleportproto.JobStatus) {
+	assert.True(t, isUUID(status.Id.Uuid))
+	assert.True(t, isRecent(status.Started.AsTime()))
+	assert.Equal(t, uint32(0), status.Logs)
+	assert.Nil(t, status.GetStopped())
+	assert.NotNil(t, status.GetPending())
+	assert.GreaterOrEqual(t, status.GetPending().CpuPerc, float32(0.0))
+	assert.LessOrEqual(t, status.GetPending().CpuPerc, float32(100.0))
 }
