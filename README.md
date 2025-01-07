@@ -54,4 +54,4 @@ telecli --help
 - Create unit tests
 - Create integration tests
 - Make README and design consistent
-- Add limitation of memory and CPU for the child jobs.
+- Fix CPU usage statistics

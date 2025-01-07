@@ -4,21 +4,41 @@
 package apitests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
 )
 
-func TestNoAuth(t *testing.T) {
-	close := startServer(t, "")
-	defer close()
+func TestAuth(t *testing.T) {
+	tests := []struct {
+		clientSecret string
+		serverSecret string
+		wantOk       bool
+	}{
+		{clientSecret: "", serverSecret: "", wantOk: true},
+		{clientSecret: "blah", serverSecret: "blah", wantOk: true},
+		{clientSecret: "nope", serverSecret: "blah", wantOk: false},
+		{clientSecret: "nope", serverSecret: "blah", wantOk: false},
+		{clientSecret: "", serverSecret: "blah", wantOk: false},
+		{clientSecret: "nope", serverSecret: "", wantOk: false},
+	}
 
-	client, closeClient := createClient(t, "")
-	defer closeClient()
+	for _, test := range tests {
+		name := fmt.Sprintf("client=%s server=%s", test.clientSecret, test.serverSecret)
+		t.Run(name, func(t *testing.T) {
+			close := mustStartServer(t, test.serverSecret)
+			defer close()
 
-	req := teleportproto.Command{Command: []string{"echo", "blah"}}
-	st, err := client.Start(testContext(), &req)
-	assert.NoError(t, err)
-	t.Log(st)
+			client := mustCreateClient(t, test.clientSecret)
+			defer client.close()
+
+			req := teleportproto.Command{Command: []string{"echo", "blah"}}
+			_, err := client.Start(testContext(), &req)
+			gotOk := (err == nil)
+			assert.Equal(t, test.wantOk, gotOk)
+		})
+	}
+
 }

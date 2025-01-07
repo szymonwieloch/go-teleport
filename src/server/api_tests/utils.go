@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
 	"github.com/szymonwieloch/go-teleport/server/service"
 	"golang.org/x/oauth2"
@@ -26,13 +25,13 @@ const address string = "localhost:1234"
 func relativePath(elem ...string) string {
 
 	_, filename, _, _ := runtime.Caller(0)
-	rootDir := path.Dir(path.Dir(path.Dir(filename)))
+	rootDir := path.Dir(path.Dir(path.Dir(path.Dir(filename))))
 	allParts := []string{rootDir}
 	allParts = append(allParts, elem...)
 	return path.Join(allParts...)
 }
 
-func startServer(t *testing.T, secret string) func() {
+func startServer(secret string) (func() error, error) {
 	opts := service.ServiceOptions{
 		Address: address,
 	}
@@ -43,12 +42,22 @@ func startServer(t *testing.T, secret string) func() {
 	}
 	srv, err := service.NewService(opts)
 	if err != nil {
-		t.Fatalf("could not start server: %s", err)
+		return nil, err
 	}
 	close := srv.ServeInBackground()
+	return close, nil
+}
+
+func mustStartServer(t *testing.T, secret string) func() {
+	close, err := startServer(secret)
+	if err != nil {
+		t.Fatalf("could not start server: %s", err)
+	}
 	return func() {
 		err := close()
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatalf("error while stopping server: %v", err)
+		}
 	}
 }
 
@@ -57,8 +66,16 @@ func testContext() context.Context {
 	return ctx
 }
 
-func createClient(t *testing.T, secret string) (teleportproto.RemoteExecutorClient, func()) {
+type client struct {
+	teleportproto.RemoteExecutorClient
+	conn *grpc.ClientConn
+}
 
+func (client client) close() {
+	client.conn.Close()
+}
+
+func createClient(secret string) (client, error) {
 	var opts []grpc.DialOption
 	if secret == "" {
 		opts = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
@@ -68,7 +85,7 @@ func createClient(t *testing.T, secret string) (teleportproto.RemoteExecutorClie
 		})}
 		creds, err := credentials.NewClientTLSFromFile(relativePath("certs", "ca_cert.pem"), "x.test.example.com") // TODO
 		if err != nil {
-			t.Fatalf("failed to load credentials: %v", err)
+			return client{}, err
 		}
 		opts = []grpc.DialOption{
 			grpc.WithPerRPCCredentials(perRPC),
@@ -78,7 +95,18 @@ func createClient(t *testing.T, secret string) (teleportproto.RemoteExecutorClie
 
 	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
-		t.Fatalf("did not connect to the server: %v", err)
+		return client{}, err
 	}
-	return teleportproto.NewRemoteExecutorClient(conn), func() { conn.Close() }
+	return client{
+		RemoteExecutorClient: teleportproto.NewRemoteExecutorClient(conn),
+		conn:                 conn,
+	}, nil
+}
+
+func mustCreateClient(t *testing.T, secret string) client {
+	cli, err := createClient(secret)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	return cli
 }
