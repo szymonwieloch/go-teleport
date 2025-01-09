@@ -5,6 +5,8 @@ package apitests
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"path"
 	"runtime"
 	"testing"
@@ -165,5 +167,28 @@ func checkStoppedJob(t *testing.T, status *teleportproto.JobStatus, id string, c
 	assert.Nil(t, status.GetPending())
 	assert.True(t, isRecent(status.GetStopped().Stopped.AsTime()))
 	assert.True(t, status.GetStopped().Stopped.AsTime().After(status.Started.AsTime()))
+}
 
+func startJob(t *testing.T, client client, cmd []string) *teleportproto.JobStatus {
+	req := teleportproto.Command{Command: cmd}
+	st, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st, cmd)
+	return st
+}
+
+func drainLogs(t *testing.T, client client, id *teleportproto.JobId) {
+	stream, err := client.Logs(testContext(), id)
+	assert.NoError(t, err)
+	for i := range 7 {
+		resp, err := stream.Recv()
+		if i == 6 {
+			assert.Equal(t, err, io.EOF)
+			break
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, resp.Text, fmt.Sprintf("Welcome %d times", i))
+		assert.True(t, isRecent(resp.Timestamp.AsTime()))
+		assert.Equal(t, resp.Src, teleportproto.LogSource_LS_STDOUT)
+	}
 }

@@ -5,12 +5,17 @@ package apitests
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/szymonwieloch/go-teleport/server/proto/teleportproto"
 )
+
+var shortCmd []string = []string{"echo", "blah"}
+var longCmd []string = []string{"sleep", "10"}
+var loggingCmd []string = []string{"bash", "-c", "for i in {0..5}; do echo Welcome $i times; sleep 0.1; done"}
 
 func TestAuth(t *testing.T) {
 	tests := []struct {
@@ -35,7 +40,7 @@ func TestAuth(t *testing.T) {
 			client := mustCreateClient(t, test.clientSecret)
 			defer client.close()
 
-			req := teleportproto.Command{Command: []string{"echo", "blah"}}
+			req := teleportproto.Command{Command: shortCmd}
 			_, err := client.Start(testContext(), &req)
 			gotOk := (err == nil)
 			assert.Equal(t, test.wantOk, gotOk)
@@ -48,23 +53,22 @@ func TestShort(t *testing.T) {
 	client, close := mustCreateClientAndServer(t)
 	defer close()
 
-	cmd := []string{"echo", "blah"}
-	req := teleportproto.Command{Command: cmd}
+	req := teleportproto.Command{Command: shortCmd}
 	st1, err := client.Start(testContext(), &req)
 	assert.NoError(t, err)
-	checkStartedJob(t, st1, cmd)
+	checkStartedJob(t, st1, shortCmd)
 	time.Sleep(time.Millisecond * 100)
 	// it should be done by now
 	st2, err := client.GetStatus(testContext(), st1.Id)
 	assert.NoError(t, err)
-	checkStoppedJob(t, st2, st1.Id.Uuid, cmd)
+	checkStoppedJob(t, st2, st1.Id.Uuid, shortCmd)
 	assert.Equal(t, st2.GetStopped().ErrorCode, int32(0))
 
 	// Stop is supposed to remove the job from the internal list and free resources
 
 	st3, err := client.Stop(testContext(), st1.Id)
 	assert.NoError(t, err)
-	checkStoppedJob(t, st3, st1.Id.Uuid, cmd)
+	checkStoppedJob(t, st3, st1.Id.Uuid, shortCmd)
 	assert.Equal(t, st2.GetStopped().ErrorCode, int32(0))
 
 	_, err = client.GetStatus(testContext(), st1.Id)
@@ -76,19 +80,18 @@ func TestShort(t *testing.T) {
 func TestLong(t *testing.T) {
 	client, close := mustCreateClientAndServer(t)
 	defer close()
-	cmd := []string{"sleep", "10"}
-	req := teleportproto.Command{Command: cmd}
+	req := teleportproto.Command{Command: longCmd}
 	st1, err := client.Start(testContext(), &req)
 	assert.NoError(t, err)
-	checkStartedJob(t, st1, cmd)
+	checkStartedJob(t, st1, longCmd)
 
 	st2, err := client.GetStatus(testContext(), st1.Id)
 	assert.NoError(t, err)
-	checkStartedJob(t, st2, cmd)
+	checkStartedJob(t, st2, longCmd)
 
 	st3, err := client.Stop(testContext(), st1.Id)
 	assert.NoError(t, err)
-	checkStoppedJob(t, st3, st1.Id.Uuid, cmd)
+	checkStoppedJob(t, st3, st1.Id.Uuid, longCmd)
 	assert.Equal(t, st3.GetStopped().ErrorCode, int32(-1))
 
 	_, err = client.GetStatus(testContext(), st1.Id)
@@ -100,14 +103,39 @@ func TestLogs(t *testing.T) {
 	client, close := mustCreateClientAndServer(t)
 	defer close()
 
-	cmd := []string{"sleep", "10"}
-	req := teleportproto.Command{Command: cmd}
+	req := teleportproto.Command{Command: loggingCmd}
 	st, err := client.Start(testContext(), &req)
 	assert.NoError(t, err)
-	checkStartedJob(t, st, cmd)
+	checkStartedJob(t, st, loggingCmd)
+
 }
 
 // Runs two jobs in parallel to check if there are any races
 func TestParallel(t *testing.T) {
+	client, close := mustCreateClientAndServer(t)
+	defer close()
 
+	req := teleportproto.Command{Command: loggingCmd}
+	st1, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st1, loggingCmd)
+
+	st2, err := client.Start(testContext(), &req)
+	assert.NoError(t, err)
+	checkStartedJob(t, st2, loggingCmd)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		drainLogs(t, client, st1.Id)
+		wg.Done()
+	}()
+
+	go func() {
+		drainLogs(t, client, st1.Id)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }

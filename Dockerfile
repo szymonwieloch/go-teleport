@@ -21,7 +21,7 @@ RUN cd src/client && go generate && \
 
 RUN cd src/server && go generate && \
     go build && \
-    go test -v -race
+    go test -v -race -tags apitests
 
 FROM alpine AS server
 RUN apk add libc6-compat
