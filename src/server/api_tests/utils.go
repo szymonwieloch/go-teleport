@@ -157,6 +157,7 @@ func checkStartedJob(t *testing.T, status *teleportproto.JobStatus, cmd []string
 	assert.NotNil(t, status.GetPending())
 	assert.GreaterOrEqual(t, status.GetPending().CpuPerc, float32(0.0))
 	assert.LessOrEqual(t, status.GetPending().CpuPerc, float32(100.0))
+	assert.GreaterOrEqual(t, status.GetPending().Memory, float32(0.0))
 
 }
 

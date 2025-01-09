@@ -25,6 +25,7 @@ func jobStatus(status jobs.JobStatus) *teleportproto.JobStatus {
 		result.Details = &teleportproto.JobStatus_Pending{
 			Pending: &teleportproto.PendingJobStatus{
 				CpuPerc: status.Pending.CPUPercentage,
+				Memory:  status.Pending.Memory,
 			},
 		}
 	}

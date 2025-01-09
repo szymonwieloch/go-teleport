@@ -174,7 +174,8 @@ func printStatus(status *teleportproto.JobStatus) {
 			fmt.Println("Stopped:", details.Stopped.Stopped.AsTime())
 			fmt.Println("E. code:", details.Stopped.ErrorCode)
 		case *teleportproto.JobStatus_Pending:
-			fmt.Println("CPU %  :", details.Pending.CpuPerc)
+			fmt.Printf("CPU %%  : %.2f\n", details.Pending.CpuPerc)
+			fmt.Printf("Memory : %.0f\n", details.Pending.Memory)
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/google/uuid"
+	"github.com/struCoder/pidusage"
 )
 
 // Waiting on the process to complete failed
@@ -74,6 +75,7 @@ func (job *Job) IsStopped() bool {
 // Returns snapshot of status of the job.
 // Thread safe.
 func (job *Job) Status() JobStatus {
+
 	job.mutex.Lock()
 	defer job.mutex.Unlock()
 	js := JobStatus{
@@ -89,7 +91,16 @@ func (job *Job) Status() JobStatus {
 			Stopped:  job.Stopped,
 		}
 	} else {
-		js.Pending = &PendingJobStatus{CPUPercentage: 1.0} // TODO: implement
+		stats, err := pidusage.GetStat(job.cmd.Process.Pid)
+		if err != nil {
+			log.Printf("error getting process statistics: %v", err)
+		} else {
+			js.Pending = &PendingJobStatus{
+				CPUPercentage: float32(stats.CPU),
+				Memory:        float32(stats.Memory),
+			}
+		}
+
 	}
 	return js
 }

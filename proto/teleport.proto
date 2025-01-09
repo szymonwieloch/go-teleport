@@ -50,6 +50,7 @@ message StoppedJobStatus{
 
 message PendingJobStatus{
     float cpu_perc = 1;
+    float memory = 2;
 }
 
 message Log{

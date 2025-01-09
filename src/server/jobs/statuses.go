@@ -19,4 +19,5 @@ type StoppedJobStatus struct {
 
 type PendingJobStatus struct {
 	CPUPercentage float32
+	Memory        float32
 }
