@@ -52,6 +52,4 @@ telecli --help
 
 # TODO
 - Create unit tests
-- Create integration tests
 - Make README and design consistent
-- Fix CPU usage statistics
