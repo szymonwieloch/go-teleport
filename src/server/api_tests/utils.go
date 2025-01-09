@@ -141,12 +141,29 @@ func isUUID(u string) bool {
 	return err == nil
 }
 
-func checkStartedJob(t *testing.T, status *teleportproto.JobStatus) {
+func checkJob(t *testing.T, status *teleportproto.JobStatus, cmd []string) {
 	assert.True(t, isUUID(status.Id.Uuid))
 	assert.True(t, isRecent(status.Started.AsTime()))
+	assert.NotNil(t, status.Command)
+	assert.Equal(t, status.Command.GetCommand(), cmd)
+}
+
+func checkStartedJob(t *testing.T, status *teleportproto.JobStatus, cmd []string) {
+	checkJob(t, status, cmd)
 	assert.Equal(t, uint32(0), status.Logs)
 	assert.Nil(t, status.GetStopped())
 	assert.NotNil(t, status.GetPending())
 	assert.GreaterOrEqual(t, status.GetPending().CpuPerc, float32(0.0))
 	assert.LessOrEqual(t, status.GetPending().CpuPerc, float32(100.0))
+
+}
+
+func checkStoppedJob(t *testing.T, status *teleportproto.JobStatus, id string, cmd []string) {
+	checkJob(t, status, cmd)
+	assert.Equal(t, status.Id.Uuid, id)
+	assert.NotNil(t, status.GetStopped())
+	assert.Nil(t, status.GetPending())
+	assert.True(t, isRecent(status.GetStopped().Stopped.AsTime()))
+	assert.True(t, status.GetStopped().Stopped.AsTime().After(status.Started.AsTime()))
+
 }
