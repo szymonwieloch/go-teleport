@@ -1,12 +1,16 @@
 # rust-teleport
 
-Fully secure and scallable remote command executor and manager
+Secure and scallable remote command executor and manager
 
-rust-teleport is a project created with intention to be a proof of my skills. It can also be used as a solid project template for Rust-based secure and efficient servers. It has MIT license and your free to use parts of the code in your projects.
+go-teleport is a project created with intention to be a sample of my skills. 
+It can also be used as a solid project template for golang-based secure and efficient servers. 
+It has the MIT license and you are free to use parts of the code in your projects.
 
 # Challenge
 
-Create a fully secure and scallable server and command line client with the capability to:
+This project is based on Teleport System Engineer interview task as defined [here](https://github.com/gravitational/careers/blob/main/challenges/systems/challenge-1.md).
+
+Create secure and scallable server and command line client with the capability to:
 
 - Remotely start a task on the server. The task is any bash-like command.
 - Query the task status.
@@ -18,15 +22,15 @@ In addition to the functional requirements there are also several quality requir
 
 - Create automated tests of the API.
 - Limit task resources to make sure that processes run by one user do not affect other users.
-- Use microservice-like architecture and assume existence of an authorization service.
-- Use fully reproducible build system.
-- Containerize the application.
+- Provide a basic authorization mechanism.
+- Use reproducible build system.
+- Containerize the application (server).
 
 # Design
 
 Full design document can be found [here](./docs/design.md).
 
-It contains all major decisons for this application and explains why they should be implemented in the given way.
+It contains discussion on the most important design choices and a brief graphical presentation of the communication process.
 
 # Build and run
 
@@ -36,20 +40,16 @@ To bild the application using docker:
 docker build -t teleport .
 ```
 
+You can also build it locally using the standard golang tools if you install few dependencies as defined in the [Dockerfile](./Dockerfile).
 To run the application:
 
 ```
 docker run -it --rm teleport /bin/bash
 ```
 
-Then you can use commands `teleport` ad `telecli` to run the server and client apps. For help run:
+Then you can use commands `server` ad `client` to run the server and client apps. For help run:
 
 ```
-teleport --help
-telecli --help
+server --help
+client --help
 ```
-
-
-# TODO
-- Create unit tests
-- Make README and design consistent
