@@ -14,14 +14,13 @@ RUN apt-get update && \
 WORKDIR /home/teleport
 COPY proto/ proto/
 COPY src/ src/
+COPY certs/ certs/
 
-RUN cd src/client && go generate && \
-    go build && \
-    go test -v -race
+RUN cd src && bash test.sh
 
-RUN cd src/server && go generate && \
-    go build && \
-    go test -v -race -tags apitests
+RUN cd src/client && go generate && go build
+
+RUN cd src/server && go generate && go build
 
 FROM alpine AS server
 RUN apk add libc6-compat
