@@ -1,8 +1,8 @@
-# rust-teleport
+# go-teleport
 
-Secure and scallable remote command executor and manager
+Secure and scalable remote command executor and manager
 
-go-teleport is a project created with intention to be a sample of my skills. 
+g`o-teleport` is a project created with intention to be a sample of my skills. 
 It can also be used as a solid project template for golang-based secure and efficient servers. 
 It has the MIT license and you are free to use parts of the code in your projects.
 
@@ -10,7 +10,7 @@ It has the MIT license and you are free to use parts of the code in your project
 
 This project is based on Teleport System Engineer interview task as defined [here](https://github.com/gravitational/careers/blob/main/challenges/systems/challenge-1.md).
 
-Create secure and scallable server and command line client with the capability to:
+Create secure and scalable server and command line client with the capability to:
 
 - Remotely start a task on the server. The task is any bash-like command.
 - Query the task status.
@@ -34,7 +34,7 @@ It contains discussion on the most important design choices and a brief graphica
 
 # Build and run
 
-To bild the application using docker:
+To build the application using docker:
 
 ```
 docker build -t teleport .
