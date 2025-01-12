@@ -48,13 +48,13 @@ Other safety features such as hardening dockers are out of scope for this projec
 
 Production-ready solution would normally consist of an authorization service that upon authentication would issue signed documents with user privileges valid for some period of time,
 that in turn would be sent by the user and used by the server to limit the scope of allowed operations.
-The communication looks roughtly like this:
+The communication looks roughly like this:
 
 1. Client connects to the authorization service.
 2. Bidirectional encryption is established using TLS. Domain of the server is verified using certificate.
-3. Client prooves his identity using a certificate or password.
+3. Client proves his identity using a certificate or password.
 5. Authorization service check in the database what permissions are assigned to the client.
-6. Authorization servcie generates a secret signed token and sends it to the client through the encrypted channel (the key is secret)
+6. Authorization service generates a secret signed token and sends it to the client through the encrypted channel (the key is secret)
   Token is usually a document (i.e. JSON) that describes assigned privileges. 
   By signing it becomes a proof that the authorization service allows access to specific resources for some period of time to the owner of this token.
 7. Having the token client can perform requests to all services until the certificate expires.
@@ -66,7 +66,7 @@ The communication looks roughtly like this:
 ![Authorization communication](./auth.jpg)
 
 This solution is however too complicated for this project as it requires use of an external authorization service which could be a project of its own.
-gRPC has a bult-in support for OAuth 2.0 which combined with TLS will give us everything that is actually required. 
+gRPC has a built-in support for OAuth 2.0 which combined with TLS will give us everything that is actually required. 
 For simplicity, the user is going to be authenticated using a basic password comparison and after authentication every operation is going to be allowed.
 
 # Application design
@@ -80,78 +80,64 @@ Client is a simple command line application with five subcommands. On receiving 
 Server is an asynchronous application with a gRPC server, authorization system, several message handlers and three collections:
 
 - Running processes
-- Information about finished processes
+- Information about finished processes (removed on calling the `Stop` endpoint to free resources)
 - Connected clients reading logs
 
 ![Teleport server](./server.jpg)
 
-In production the information about finished processes would be kept only for a period of time to avoid reaching resource limits and possibly would be saved to an external file/database to save RAM, but in this simple challenge only internal RAM-based collection are used.
+In production the information about finished processes would be kept only for a period of time to avoid reaching resource limits and possibly would be saved to an external file or database to save RAM, but in this simple challenge only internal RAM-based collection are used and there is no limit.
 
-# Resource limits
-
-There are three kinds of limits that the server should impose on tasks:
-
-- CPU
-- Memory
-- Disk
-
-## CPU
-
-Tthere are at least three ways how CPU usage can be limited:
-
-- Total maximal CPU runtime can be configured using the setrlimit() Linux function (https://linux.die.net/man/2/setrlimit) or alternatively setrlimit64() for higher ranges. This approach limits total CPU runtime but not includes the time when the process is running but doing nothing, for example the `sleep` command.
-- Limiting CPU cores available to the process by using the sched_setaffinity() function (https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html).
-- cgroups (https://man7.org/linux/man-pages/man7/cgroups.7.html) can be used to flexibly limit maximum CPU usage at the given moment.
-
-Because limiting resources is not the key feature of this application, the first option (setrlimit()) is used.
-
-## Memory
-
-Memory - memory can be easily limited using the setrlimit() function.
-
-## Disk
-
-Linux qute surprisingly does not provide any good disk management mechanisms. There are three possiblities:
-
-- Throotling can be implemented using cgroups.
-- Process quotas are not supported but can be emulated using user quotas. In this approach a new user needs to be created for every task.
-- Limiting single output file size can be easily achieved using setrlimit() function. This still not stop the application from creating millions of small files.
-
-Because the first two solutions are quite complicated, the third is implemented.
+### Resource Limits
+  Users can spawn remotely multiple processes that would normally interfere with whatever the server is doing normally.
+  To prevent that it is necessary to introduce some kind of resource usage limits.
+  Linux already has a solid mechanism to achieve that: [cgroups](https://en.wikipedia.org/wiki/Cgroups).
+  Control groups allow you to set limits of resource usage on a process or a group of processes.
+  Resources include memory, CPU, networking and hard drive usage.
+  For the sake of simplicity, this project assumes a hardcoded 20% of a single CPU usage and 10 MB of memory as the actual limits imposed on all spawned processes.
 
 # Tests
 
-The project uses two kinds of tests:
+No project is complete until it is tested an confirmed to work.
+While this project is not intended for production use, the patterns of testing are intended to match those of production quality systems.
+Two levels of testing are intended for this project:
+- Unit tests - written in the Golang language and using [mockgen](https://github.com/uber-go/mock) mock generation tool from Uber to remove some of dependencies.
+- API tests of the server. While unit tests do confirm that small components of the project work correctly, they are known not to find many kinds of issues.
+  [ISTQB](https://www.istqb.org/) recommends combining unit tests with component integration tests - tests that make all parts of the application work together.
+  A natural choice are API tests that trigger the server API by launching and managing actual processes.
 
-- Unit tests - written in the Rust language.
-- API tests of the server. While the server is written in a high performance language and uses asynchronous dispatching to optimize resource usage, there is no need for this in tests. To shorten development and make tests more managable, the tests are written in the Python 3 language.
+Because of the requirement to manage multiple clients in parallel (multithreading), there is a significant potential for synchronization issues.
+Luckily golang provides race detector that will be enabled during both kinds of tests.
+
+There are several kinds of tests that would normally be implemented for such a system but are skipped because of limited time:
+- Performance tests - check how many parallel requests the system can handle.
+- Reliability - long running tests of the system under random load that look for random crashes and resource leaks.
+- Usability - feedback from uses on ease of use.
+- Code reviews - while scientifically proven to provide huge quality improvements, they require more people in the team to be performed.
 
 # Build system
 
-Rust already has a default build system called cargo. However, to make the builds fully reproducible a complete environment is needed and a Dockerfile needs to be created. It consists of three stages:
+Golang comes with a default build system that works on multiple platforms.
+However the project requires set of external tools for code generation.
+To enable a reproducible build, a `Dockerfile` with a complete build environment will be provided.
+The same docker can be also used to launch all implemented tests.
 
-1. Rust container designed to have a reproducible client and server builds together with unit tests.
-2. Python 3 container designed to perform the API tests.
-3. Final container designed to be small but able to run client and server applications.
+Finally the built application should be wrapped inside another docker image, typically `alpine` as it provides the smallest size and 
+small number of installed applications minimizes number of possible vulnerabilities.
 
 # Libraries and tools
 
-Rust crates:
+Golang libraries:
 
-- `tonic` - the only production-ready GRPC Rust crate
-  tokio - asynchronous event dispatcher
-- `tokio::process` - asynchronous process management
-- `clap` - command line argument parser for the client
-- `jsonwebtoken` - for creation and validation of JWT tokens
-- `serde` - JSON and configuration deserialization
+- [golang gRPC](https://github.com/grpc/grpc-go) - code generators for gRPC.
+- [go-arg](https://github.com/alexflint/go-arg) - great command line argument parser. 
+- [cgroups](https://github.com/containerd/cgroups) - Golang interface for the Linux cgroups.
 
 Tests:
 
-- `Python 3`
-- `pytest` - the most popular Python 3 test executor
-- `grpc` python package - GRPC functionality
-- `stress` application - for resource limit tests, it is designed to simulate high resource usage
+- Built-in golang test framework
+- [mockgen](https://github.com/uber-go/mock) - mock generator from Uber.
+- [testify](https://github.com/stretchr/testify) - popular golang library with assertions for unit tests.
 
-Other
-
-- Build system: `cargo`, `Docker`
+Dockers:
+- [golang](https://hub.docker.com/_/golang) - official golang docker, a solid base for building golang applications.
+- [alpine](https://hub.docker.com/_/alpine) - minimalistic Linux, perfect for releasing services in the cloud.
