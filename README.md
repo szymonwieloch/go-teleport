@@ -2,7 +2,7 @@
 
 Secure and scalable remote command executor and manager
 
-g`o-teleport` is a project created with intention to be a sample of my skills. 
+`go-teleport` is a project created with intention to be a sample of my skills. 
 It can also be used as a solid project template for golang-based secure and efficient servers. 
 It has the MIT license and you are free to use parts of the code in your projects.
 
