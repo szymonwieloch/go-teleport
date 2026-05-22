@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  GO_VERSION: "1.23"
+
+jobs:
+  # Build using the existing Dockerfile
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t teleport:ci .
+
+  # Run go vet for static analysis
+  vet:
+    name: Go vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install Go tools
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      - name: Generate protobuf code (client)
+        working-directory: src/client
+        run: go generate ./...
+      - name: Generate protobuf code (server)
+        working-directory: src/server
+        run: go generate ./...
+      - name: Run go vet (client)
+        working-directory: src/client
+        run: go vet ./...
+      - name: Run go vet (server)
+        working-directory: src/server
+        run: go vet ./...
+
+  # Run staticcheck for advanced linting
+  staticcheck:
+    name: Staticcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install Go tools
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+      - name: Generate protobuf code (client)
+        working-directory: src/client
+        run: go generate ./...
+      - name: Generate protobuf code (server)
+        working-directory: src/server
+        run: go generate ./...
+      - name: Run staticcheck (client)
+        working-directory: src/client
+        run: staticcheck ./...
+      - name: Run staticcheck (server)
+        working-directory: src/server
+        run: staticcheck ./...
+
+  # Run govulncheck for security vulnerabilities
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run security audit (client)
+        working-directory: src/client
+        run: govulncheck ./...
+      - name: Run security audit (server)
+        working-directory: src/server
+        run: govulncheck ./...
+
+  # Check for outdated modules (allowed to fail)
+  outdated:
+    name: Check outdated modules
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install go-mod-outdated
+        run: go install github.com/psampaz/go-mod-outdated@latest
+      - name: Check outdated (client)
+        working-directory: src/client
+        run: go list -u -m -json all | go-mod-outdated -direct -update
+      - name: Check outdated (server)
+        working-directory: src/server
+        run: go list -u -m -json all | go-mod-outdated -direct -update
+
+  # Verify Go code formatting
+  fmt:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Check formatting (client)
+        working-directory: src/client
+        run: test -z "$(gofmt -l .)"
+      - name: Check formatting (server)
+        working-directory: src/server
+        run: test -z "$(gofmt -l .)"
+
+  # Run unit tests with race detection
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install Go tools
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          go install go.uber.org/mock/mockgen@latest
+      - name: Generate protobuf code and mocks (client)
+        working-directory: src/client
+        run: go generate ./...
+      - name: Generate protobuf code (server)
+        working-directory: src/server
+        run: go generate ./...
+      - name: Run tests (client)
+        working-directory: src/client
+        run: go test -race -coverprofile cover.out -coverpkg=. ./...
+      - name: Run tests (server)
+        working-directory: src/server
+        run: go test -race -tags apitests -coverprofile cover.out -coverpkg=.,./jobs,./service ./...
