@@ -121,8 +121,37 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Install protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install Go tools
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.1
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          go install go.uber.org/mock/mockgen@v0.5.0
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Generate proto files (client)
+        working-directory: src/client
+        run: |
+          mkdir -p proto mocks
+          echo 'package mocks' > mocks/placeholder.go
+          protoc -I=../../proto --go-grpc_out=. --go_out=. teleport.proto
+      - name: Tidy modules (client)
+        working-directory: src/client
+        run: go mod tidy
+      - name: Full go generate (client)
+        working-directory: src/client
+        run: go generate ./...
+      - name: Generate proto files (server)
+        working-directory: src/server
+        run: |
+          mkdir -p proto
+          protoc -I=../../proto --go-grpc_out=. --go_out=. teleport.proto
+      - name: Tidy modules (server)
+        working-directory: src/server
+        run: go mod tidy
+      - name: Full go generate (server)
+        working-directory: src/server
+        run: go generate ./...
       - name: Run security audit (client)
         working-directory: src/client
         run: govulncheck ./...
