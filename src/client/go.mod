@@ -1,6 +1,6 @@
 module github.com/szymonwieloch/go-teleport/client
 
-go 1.23.4
+go 1.25.0
 
 require (
 	github.com/alexflint/go-arg v1.5.1
